@@ -1,0 +1,143 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        jcenter()
+        mavenLocal()
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+        maven {
+            url "https://maven.pkg.github.com/mooltiverse/nyx"
+            credentials { // Taken from https://github.com/jcansdale-test/gradle-java-consume/pull/1/files
+                username = "token"
+                password = $/4fa4cac049dd5b9c0df00661a3a09fbda3abf64f/$
+            }
+        }
+        maven {
+            url "https://dl.bintray.com/ppanda-beta/maven"
+        }
+    }
+}
+
+plugins {
+    id 'com.github.johnrengelman.shadow' version '6.0.0' apply false
+    id "com.mooltiverse.oss.nyx" version "0.0.2-alpha.1" apply false
+}
+
+
+allprojects {
+    repositories {
+        mavenCentral()
+        jcenter()
+        mavenLocal()
+        maven {
+            url "https://dl.bintray.com/ppanda-beta/maven"
+        }
+    }
+}
+
+subprojects {
+    apply plugin: 'maven-publish'
+    apply plugin: 'signing'
+    apply plugin: 'com.mooltiverse.oss.nyx'
+    apply plugin: 'com.github.johnrengelman.shadow'
+
+    afterEvaluate {
+        shadowJar {
+            zip64 = true
+        }
+    }
+}
+
+
+ext {
+    bintrayUserName = findProperty("bintrayUserName")
+    bintrayApiToken = findProperty("bintrayApiToken")
+    signingKey = findProperty("signingKey")
+    signingPassword = findProperty("signingPassword")
+}
+
+void setupPublishing(prj, artifactName, pomName, pomDescription) {
+    prj.publishing {
+        publications {
+            "$prj.name"(MavenPublication) {
+                from prj.components.java
+                artifactId artifactName
+
+                pom {
+                    name = pomName
+                    description = pomDescription
+                    licenses {
+                        license {
+                            name = 'MIT License'
+                            url = 'https://opensource.org/licenses/MIT'
+                        }
+                    }
+                    developers {
+                        developer {
+                            id = 'ppanda-beta'
+                            name = 'Palash Das'
+                            email = 'dpalash.new@gmail.com'
+                        }
+                    }
+                }
+
+            }
+        }
+
+        repositories {
+            maven {
+                name "jCenterOf" + prj.name
+                credentials {
+                    username = bintrayUserName
+                    password = bintrayApiToken
+                }
+                url = "https://api.bintray.com/maven/${bintrayUserName}/maven/${artifactName}/;publish=1"
+            }
+        }
+    }
+
+    def removeCurrentVersionTask = prj.task("removeCurrentVersionIfExists", {
+        doFirst {
+            deleteArtifactVersion(prj.version, artifactName, false)
+        }
+    })
+
+    def removePoisonousMavenVersionTask = prj.task("removePoisonousMavenMetadataBasedFakeVersion", {
+        doLast {
+            deleteArtifactVersion(artifactName, artifactName)
+        }
+    })
+
+    def tasks = prj.getTasks()
+
+    def publishToJCenterTask = tasks.find { task ->
+        task.name.contains("ToJCenterOf${prj.name}Repository")
+    }
+
+    publishToJCenterTask.dependsOn(removeCurrentVersionTask)
+    publishToJCenterTask.finalizedBy(removePoisonousMavenVersionTask)
+
+
+    prj.signing {
+        useInMemoryPgpKeys(signingKey, signingPassword)
+
+        sign prj.publishing.publications[prj.name]
+    }
+}
+
+
+private void deleteArtifactVersion(versionId, artifactName, stopOnFail = true) {
+    def artifactLocation = "https://api.bintray.com/packages/${bintrayUserName}/maven/${artifactName}/versions/${versionId}"
+    def basicAuthHeader = "Basic " + Base64.getEncoder().encodeToString((bintrayUserName + ":" + bintrayApiToken).getBytes())
+    def deleteConnection = new URL(artifactLocation).openConnection();
+    deleteConnection.setRequestMethod("DELETE")
+    deleteConnection.setRequestProperty("Authorization", basicAuthHeader)
+    deleteConnection.setDoOutput(true)
+    deleteConnection.getOutputStream().flush()
+    if (deleteConnection.getResponseCode().equals(200)) {
+        println("Successfully deleted artifact " + deleteConnection.getInputStream().getText())
+    } else if (stopOnFail) {
+        throw new StopActionException("Failed to delete artifact " + deleteConnection.getInputStream().getText())
+    }
+}
