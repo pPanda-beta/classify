@@ -4,14 +4,8 @@ buildscript {
         jcenter()
         mavenLocal()
         maven {
-            url "https://plugins.gradle.org/m2/"
-        }
-        maven {
-            url "https://maven.pkg.github.com/mooltiverse/nyx"
-            credentials { // Taken from https://github.com/jcansdale-test/gradle-java-consume/pull/1/files
-                username = "token"
-                password = $/4fa4cac049dd5b9c0df00661a3a09fbda3abf64f/$
-            }
+            name = 'ajoberstar-backup'
+            url = 'https://ajoberstar.github.io/bintray-backup/'
         }
         maven {
             url "https://dl.bintray.com/ppanda-beta/maven"
@@ -21,7 +15,7 @@ buildscript {
 
 plugins {
     id 'com.github.johnrengelman.shadow' version '6.0.0' apply false
-    id "com.mooltiverse.oss.nyx" version "0.0.2-alpha.1" apply false
+    id 'org.ajoberstar.reckon' version '0.13.0' apply true
 }
 
 
@@ -39,12 +33,16 @@ allprojects {
 subprojects {
     apply plugin: 'maven-publish'
     apply plugin: 'signing'
-    apply plugin: 'com.mooltiverse.oss.nyx'
     apply plugin: 'com.github.johnrengelman.shadow'
 
     afterEvaluate {
         shadowJar {
             zip64 = true
+        }
+
+        reckon {
+            scopeFromProp()
+            stageFromProp('beta', 'rc', 'final')
         }
     }
 }
