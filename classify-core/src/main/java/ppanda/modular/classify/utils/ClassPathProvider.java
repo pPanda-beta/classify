@@ -3,6 +3,7 @@ package ppanda.modular.classify.utils;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
+import java.io.File;
 import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -64,7 +65,7 @@ class FilteredClassPaths implements ClassPathProvider {
     val jvmClassPath = Arrays.stream(
         AccessController.doPrivileged(
             (PrivilegedAction<String>) (() -> System.getProperty("java.class.path")))
-            .split(":")
+            .split(File.pathSeparator)
     )
         .map(Paths::get)
         .map(Path::toAbsolutePath);
