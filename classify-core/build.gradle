@@ -15,3 +15,10 @@ dependencies {
     testAnnotationProcessor 'org.projectlombok:lombok:1.18.16'
 }
 
+
+setupPublishing(
+        this,
+        project.name,
+        'Classify Core',
+        'Utility to handle safe and isolated class loading for java8'
+)
